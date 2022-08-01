@@ -24,7 +24,7 @@ class ANN:
         np.random.seed(1)
  
         for l in range(1, len(self.layers_size)):
-            self.parameters["W" + str(l)] = np.random.randn(self.layers_size[l], self.layers_size[l - 1]) / np.sqrt(
+            self.parameters["W" + str(l)] = np.random.randn(self.layers_size[l - 1], self.layers_size[l]) / np.sqrt(
                 self.layers_size[l - 1])
             self.parameters["b" + str(l)] = np.zeros((self.layers_size[l], 1))
  
@@ -33,13 +33,13 @@ class ANN:
  
         A = X.T
         for l in range(self.L - 1):
-            Z = self.parameters["W" + str(l + 1)].dot(A) + self.parameters["b" + str(l + 1)]
+            Z = self.parameters["W" + str(l + 1)].T.dot(A) + self.parameters["b" + str(l + 1)]
             A = self.sigmoid(Z)
             store["A" + str(l + 1)] = A
             store["W" + str(l + 1)] = self.parameters["W" + str(l + 1)]
             store["Z" + str(l + 1)] = Z
  
-        Z = self.parameters["W" + str(self.L)].dot(A) + self.parameters["b" + str(self.L)]
+        Z = self.parameters["W" + str(self.L)].T.dot(A) + self.parameters["b" + str(self.L)]
         A = self.softmax(Z)
         store["A" + str(self.L)] = A
         store["W" + str(self.L)] = self.parameters["W" + str(self.L)]
@@ -60,19 +60,19 @@ class ANN:
         A = store["A" + str(self.L)]
         dZ = A - Y.T
  
-        dW = dZ.dot(store["A" + str(self.L - 1)].T) / self.n
+        dW = store["A" + str(self.L - 1)].dot(dZ.T) / self.n
         db = np.sum(dZ, axis=1, keepdims=True) / self.n
-        dAPrev = store["W" + str(self.L)].T.dot(dZ)
+        dAPrev = store["W" + str(self.L)].dot(dZ)
  
         derivatives["dW" + str(self.L)] = dW
         derivatives["db" + str(self.L)] = db
  
         for l in range(self.L - 1, 0, -1):
             dZ = dAPrev * self.sigmoid_derivative(store["Z" + str(l)])
-            dW = 1. / self.n * dZ.dot(store["A" + str(l - 1)].T)
+            dW = 1. / self.n * store["A" + str(l - 1)].dot(dZ.T)
             db = 1. / self.n * np.sum(dZ, axis=1, keepdims=True)
             if l > 1:
-                dAPrev = store["W" + str(l)].T.dot(dZ)
+                dAPrev = store["W" + str(l)].dot(dZ)
  
             derivatives["dW" + str(l)] = dW
             derivatives["db" + str(l)] = db
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     layers_dims = [32, 32, 32, 32, 2]
  
     ann = ANN(layers_dims)
-    ann.fit(train_x, train_y, learning_rate=0.1, n_iterations=100000)
+    ann.fit(train_x, train_y, learning_rate=0.1, n_iterations=5000)
     print("Train Accuracy:", ann.predict(train_x, train_y))
     print("Test Accuracy:", ann.predict(test_x, test_y))
     ann.plot_cost()
