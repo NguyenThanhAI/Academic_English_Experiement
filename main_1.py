@@ -12,14 +12,17 @@ class ANN:
         self.L = len(self.layers_size)
         self.n = 0
         self.costs = []
- 
-    def sigmoid(self, Z):
+    
+    @staticmethod
+    def sigmoid(Z):
         return 1 / (1 + np.exp(-Z))
 
-    def relu(self, Z):
+    @staticmethod
+    def relu(Z):
         return np.where(Z >= 0, Z, 0)
  
-    def softmax(self, Z):
+    @staticmethod
+    def softmax(Z):
         expZ = np.exp(Z - np.max(Z))
         return expZ / expZ.sum(axis=0, keepdims=True)
  
@@ -50,11 +53,13 @@ class ANN:
  
         return A, store
  
-    def sigmoid_derivative(self, Z):
+    @staticmethod
+    def sigmoid_derivative(Z):
         s = 1 / (1 + np.exp(-Z))
         return s * (1 - s)
 
-    def relu_derivative(self, Z):
+    @staticmethod
+    def relu_derivative(Z):
         return np.where(Z >= 0, 1, 0)
  
     def backward(self, X, Y, store):
