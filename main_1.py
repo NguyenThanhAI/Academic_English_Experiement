@@ -15,6 +15,9 @@ class ANN:
  
     def sigmoid(self, Z):
         return 1 / (1 + np.exp(-Z))
+
+    def relu(self, Z):
+        return np.where(Z >= 0, Z, 0)
  
     def softmax(self, Z):
         expZ = np.exp(Z - np.max(Z))
@@ -34,7 +37,7 @@ class ANN:
         A = X.T
         for l in range(self.L - 1):
             Z = self.parameters["W" + str(l + 1)].T.dot(A) + self.parameters["b" + str(l + 1)]
-            A = self.sigmoid(Z)
+            A = self.relu(Z)
             store["A" + str(l + 1)] = A
             store["W" + str(l + 1)] = self.parameters["W" + str(l + 1)]
             store["Z" + str(l + 1)] = Z
@@ -50,6 +53,9 @@ class ANN:
     def sigmoid_derivative(self, Z):
         s = 1 / (1 + np.exp(-Z))
         return s * (1 - s)
+
+    def relu_derivative(self, Z):
+        return np.where(Z >= 0, 1, 0)
  
     def backward(self, X, Y, store):
  
@@ -68,7 +74,7 @@ class ANN:
         derivatives["db" + str(self.L)] = db
  
         for l in range(self.L - 1, 0, -1):
-            dZ = dAPrev * self.sigmoid_derivative(store["Z" + str(l)])
+            dZ = dAPrev * self.relu_derivative(store["Z" + str(l)])
             dW = 1. / self.n * store["A" + str(l - 1)].dot(dZ.T)
             db = 1. / self.n * np.sum(dZ, axis=1, keepdims=True)
             if l > 1:
