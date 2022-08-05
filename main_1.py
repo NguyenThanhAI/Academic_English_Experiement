@@ -30,26 +30,26 @@ class ANN:
         np.random.seed(1)
  
         for l in range(1, len(self.layers_size)):
-            self.parameters["W" + str(l)] = np.random.randn(self.layers_size[l - 1], self.layers_size[l]) / np.sqrt(
+            self.parameters["W_" + str(l)] = np.random.randn(self.layers_size[l - 1], self.layers_size[l]) / np.sqrt(
                 self.layers_size[l - 1])
-            self.parameters["b" + str(l)] = np.zeros((self.layers_size[l], 1))
+            self.parameters["b_" + str(l)] = np.zeros((self.layers_size[l], 1))
  
     def forward(self, X):
         store = {}
  
         A = X.T
         for l in range(self.L - 1):
-            Z = self.parameters["W" + str(l + 1)].T.dot(A) + self.parameters["b" + str(l + 1)]
+            Z = self.parameters["W_" + str(l + 1)].T.dot(A) + self.parameters["b_" + str(l + 1)]
             A = self.relu(Z)
-            store["A" + str(l + 1)] = A
-            store["W" + str(l + 1)] = self.parameters["W" + str(l + 1)]
-            store["Z" + str(l + 1)] = Z
+            store["A_" + str(l + 1)] = A
+            store["W_" + str(l + 1)] = self.parameters["W_" + str(l + 1)]
+            store["Z_" + str(l + 1)] = Z
  
-        Z = self.parameters["W" + str(self.L)].T.dot(A) + self.parameters["b" + str(self.L)]
+        Z = self.parameters["W_" + str(self.L)].T.dot(A) + self.parameters["b_" + str(self.L)]
         A = self.softmax(Z)
-        store["A" + str(self.L)] = A
-        store["W" + str(self.L)] = self.parameters["W" + str(self.L)]
-        store["Z" + str(self.L)] = Z
+        store["A_" + str(self.L)] = A
+        store["W_" + str(self.L)] = self.parameters["W_" + str(self.L)]
+        store["Z_" + str(self.L)] = Z
  
         return A, store
  
@@ -66,27 +66,27 @@ class ANN:
  
         derivatives = {}
  
-        store["A0"] = X.T
+        store["A_0"] = X.T
  
-        A = store["A" + str(self.L)]
+        A = store["A_" + str(self.L)]
         dZ = A - Y.T
  
-        dW = store["A" + str(self.L - 1)].dot(dZ.T) / self.n
+        dW = store["A_" + str(self.L - 1)].dot(dZ.T) / self.n
         db = np.sum(dZ, axis=1, keepdims=True) / self.n
-        dAPrev = store["W" + str(self.L)].dot(dZ)
+        dAPrev = store["W_" + str(self.L)].dot(dZ)
  
-        derivatives["dW" + str(self.L)] = dW
-        derivatives["db" + str(self.L)] = db
+        derivatives["dW_" + str(self.L)] = dW
+        derivatives["db_" + str(self.L)] = db
  
         for l in range(self.L - 1, 0, -1):
-            dZ = dAPrev * self.relu_derivative(store["Z" + str(l)])
-            dW = 1. / self.n * store["A" + str(l - 1)].dot(dZ.T)
+            dZ = dAPrev * self.relu_derivative(store["Z_" + str(l)])
+            dW = 1. / self.n * store["A_" + str(l - 1)].dot(dZ.T)
             db = 1. / self.n * np.sum(dZ, axis=1, keepdims=True)
             if l > 1:
-                dAPrev = store["W" + str(l)].dot(dZ)
+                dAPrev = store["W_" + str(l)].dot(dZ)
  
-            derivatives["dW" + str(l)] = dW
-            derivatives["db" + str(l)] = db
+            derivatives["dW_" + str(l)] = dW
+            derivatives["db_" + str(l)] = db
  
         return derivatives
  
@@ -104,10 +104,10 @@ class ANN:
             derivatives = self.backward(X, Y, store)
  
             for l in range(1, self.L + 1):
-                self.parameters["W" + str(l)] = self.parameters["W" + str(l)] - learning_rate * derivatives[
-                    "dW" + str(l)]
-                self.parameters["b" + str(l)] = self.parameters["b" + str(l)] - learning_rate * derivatives[
-                    "db" + str(l)]
+                self.parameters["W_" + str(l)] = self.parameters["W_" + str(l)] - learning_rate * derivatives[
+                    "dW_" + str(l)]
+                self.parameters["b_" + str(l)] = self.parameters["b_" + str(l)] - learning_rate * derivatives[
+                    "db_" + str(l)]
  
             if loop % 100 == 0:
                 print("Cost: ", cost, "Train Accuracy:", self.predict(X, Y))
