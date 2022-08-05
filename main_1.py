@@ -1,17 +1,49 @@
+import os
+import argparse
+import pickle
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 import matplotlib.pylab as plt
 from sklearn.preprocessing import OneHotEncoder
+
+import tensorflow as tf
  
- 
+
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def get_args():
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--model_dir", type=str, default=".")
+    parser.add_argument("--mode", type=str, choices=["train", "inference"])
+    parser.add_argument("--load", type=str2bool, default=False)
+
+    args = parser.parse_args()
+
+    return args
+
+
 class ANN:
     def __init__(self, layers_size):
         self.layers_size = layers_size
         self.parameters = {}
         self.L = len(self.layers_size)
         self.n = 0
-        self.costs = []
+        self.train_costs = []
+        self.val_costs = []
+        self.train_accs = []
+        self.val_accs = []
     
     @staticmethod
     def sigmoid(Z):
@@ -90,30 +122,45 @@ class ANN:
  
         return derivatives
  
-    def fit(self, X, Y, learning_rate=0.01, n_iterations=2500):
+    def fit(self, train_x, train_y, val_x, val_y, learning_rate=0.01, batch_size=64, n_iterations=2500):
         np.random.seed(1)
  
-        self.n = X.shape[0]
+        #self.n = X.shape[0]
+        self.n = batch_size
  
-        self.layers_size.insert(0, X.shape[1])
- 
+        self.layers_size.insert(0, train_x.shape[1])
+        indices = np.arange(train_x.shape[0])
         self.initialize_parameters()
         for loop in range(n_iterations):
-            A, store = self.forward(X)
-            cost = -np.mean(Y * np.log(A.T+ 1e-8))
-            derivatives = self.backward(X, Y, store)
+            chosen_index = np.random.choice(indices, size=batch_size)
+            x_batch = train_x[chosen_index]
+            y_batch = train_y[chosen_index]
+            A, store = self.forward(x_batch)
+            #cost = -np.mean(y_batch * np.log(A.T+ 1e-8))
+            derivatives = self.backward(x_batch, y_batch, store)
  
             for l in range(1, self.L + 1):
                 self.parameters["W_" + str(l)] = self.parameters["W_" + str(l)] - learning_rate * derivatives[
                     "dW_" + str(l)]
                 self.parameters["b_" + str(l)] = self.parameters["b_" + str(l)] - learning_rate * derivatives[
                     "db_" + str(l)]
- 
+
+            
             if loop % 100 == 0:
-                print("Cost: ", cost, "Train Accuracy:", self.predict(X, Y))
+                
+                train_A, _ = self.forward(train_x)
+                train_cost = -np.mean(train_y * np.log(train_A.T + 1e-8))
+                train_accuracy = self.predict(train_x, train_y)
+                val_A, _ = self.forward(val_x)
+                val_cost = -np.mean(val_y * np.log(val_A.T + 1e-8))
+                val_accuracy = self.predict(val_x, val_y)
+                print("Step: {}, Train cost: {}, Train accuracy: {}, Val cost: {}, Val accuracy: {}".format(loop, train_cost, train_accuracy, val_cost, val_accuracy))
  
-            if loop % 10 == 0:
-                self.costs.append(cost)
+            #if loop % 10 == 0:
+                self.train_costs.append(train_cost)
+                self.val_costs.append(val_cost)
+                self.train_accs.append(train_accuracy)
+                self.val_accs.append(val_accuracy)
  
     def predict(self, X, Y):
         A, cache = self.forward(X)
@@ -124,9 +171,21 @@ class ANN:
  
     def plot_cost(self):
         plt.figure()
-        plt.plot(np.arange(len(self.costs)), self.costs)
-        plt.xlabel("epochs")
+        plt.subplots(2, 1, sharex=True)
+        plt.subplot(2, 1, 1)
+        plt.plot(np.arange(len(self.train_costs)), self.train_costs, label="train cost")
+        plt.plot(np.arange(len(self.val_costs)), self.val_costs, label="val cost")
+        plt.xlabel("steps")
         plt.ylabel("cost")
+        plt.legend()
+        plt.grid()
+        plt.subplot(2, 1, 2)
+        plt.plot(np.arange(len(self.train_accs)), self.train_accs, label="train accuracy")
+        plt.plot(np.arange(len(self.val_accs)), self.val_accs, label="val accuracy")
+        plt.xlabel("steps")
+        plt.ylabel("accuracy")
+        plt.legend()
+        plt.grid()
         plt.show()
  
  
@@ -134,6 +193,9 @@ def pre_process_data(train_x, train_y, test_x, test_y):
     # Normalize
     train_x = train_x / 255.
     test_x = test_x / 255.
+
+    train_x = np.reshape(train_x, newshape=(train_x.shape[0], -1))
+    test_x = np.reshape(test_x, newshape=(test_x.shape[0], -1))
  
     enc = OneHotEncoder(sparse=False, categories='auto')
     train_y = enc.fit_transform(train_y.reshape(len(train_y), -1))
@@ -144,27 +206,37 @@ def pre_process_data(train_x, train_y, test_x, test_y):
  
  
 if __name__ == '__main__':
-    csv_path = r"C:\Users\Thanh\Downloads\voice_gender\voice.csv"
-    batch_size = 64
+    #csv_path = r"C:\Users\Thanh\Downloads\voice_gender\voice.csv"
+    #batch_size = 64
+#
+    #df = pd.read_csv(csv_path)
+    #df['label'] = df['label'].replace({'male':1,'female':0})
+#
+    #x = df.drop("label", axis=1).to_numpy(dtype=np.float)
+    #y = df["label"].values
+    #labels = np.zeros(shape=(y.shape[0], 2))
+    #labels[np.arange(y.shape[0]), y] = 1
+    #x = (x - np.min(x, axis=0, keepdims=True))/(np.max(x, axis=0, keepdims=True) - np.min(x, axis=0, keepdims=True))
+#
+    #skf = StratifiedKFold(n_splits=5)
+    #for train_index, test_index in skf.split(x, y):
+    #    train_x, test_x = x[train_index], x[test_index]
+    #    train_y, test_y = labels[train_index], labels[test_index]
 
-    df = pd.read_csv(csv_path)
-    df['label'] = df['label'].replace({'male':1,'female':0})
+    args = get_args()
+    learning_rate = 0.05
+    batch_size = 256
+    n_iterations = 10000
 
-    x = df.drop("label", axis=1).to_numpy(dtype=np.float)
-    y = df["label"].values
-    labels = np.zeros(shape=(y.shape[0], 2))
-    labels[np.arange(y.shape[0]), y] = 1
-    x = (x - np.min(x, axis=0, keepdims=True))/(np.max(x, axis=0, keepdims=True) - np.min(x, axis=0, keepdims=True))
+    (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.fashion_mnist.load_data()
 
-    skf = StratifiedKFold(n_splits=5)
-    for train_index, test_index in skf.split(x, y):
-        train_x, test_x = x[train_index], x[test_index]
-        train_y, test_y = labels[train_index], labels[test_index]
- 
-    layers_dims = [32, 32, 32, 32, 2]
+    train_x, train_y, test_x, test_y = pre_process_data(train_x=train_images, train_y=train_labels, test_x=test_images, test_y=test_labels)
+    print(train_x.shape, train_y.shape, test_x.shape, test_y.shape)
+    #layers_dims = [32, 32, 32, 32, 2]
+    layers_dims = [128, 128, 10]
  
     ann = ANN(layers_dims)
-    ann.fit(train_x, train_y, learning_rate=0.1, n_iterations=5000)
+    ann.fit(train_x, train_y, test_x, test_y, learning_rate=learning_rate, batch_size=batch_size, n_iterations=n_iterations)
     print("Train Accuracy:", ann.predict(train_x, train_y))
     print("Test Accuracy:", ann.predict(test_x, test_y))
     ann.plot_cost()
