@@ -150,10 +150,10 @@ class ANN:
                 
                 train_A, _ = self.forward(train_x)
                 train_cost = -np.mean(train_y * np.log(train_A.T + 1e-8))
-                train_accuracy = self.predict(train_x, train_y)
+                train_accuracy = self.evaluate(train_x, train_y)
                 val_A, _ = self.forward(val_x)
                 val_cost = -np.mean(val_y * np.log(val_A.T + 1e-8))
-                val_accuracy = self.predict(val_x, val_y)
+                val_accuracy = self.evaluate(val_x, val_y)
                 print("Step: {}, Train cost: {}, Train accuracy: {}, Val cost: {}, Val accuracy: {}".format(loop, train_cost, train_accuracy, val_cost, val_accuracy))
  
             #if loop % 10 == 0:
@@ -162,12 +162,16 @@ class ANN:
                 self.train_accs.append(train_accuracy)
                 self.val_accs.append(val_accuracy)
  
-    def predict(self, X, Y):
+    def evaluate(self, X, Y):
         A, cache = self.forward(X)
         y_hat = np.argmax(A, axis=0)
         Y = np.argmax(Y, axis=1)
         accuracy = (y_hat == Y).mean()
         return accuracy * 100
+
+    def predict(self, X):
+        A, cache = self.forward(X)
+        return A
  
     def plot_cost(self):
         plt.figure()
@@ -237,6 +241,12 @@ if __name__ == '__main__':
  
     ann = ANN(layers_dims)
     ann.fit(train_x, train_y, test_x, test_y, learning_rate=learning_rate, batch_size=batch_size, n_iterations=n_iterations)
-    print("Train Accuracy:", ann.predict(train_x, train_y))
-    print("Test Accuracy:", ann.predict(test_x, test_y))
+    print("Train Accuracy:", ann.evaluate(train_x, train_y))
+    print("Test Accuracy:", ann.evaluate(test_x, test_y))
     ann.plot_cost()
+
+    prediction_array = ann.predict(test_x).T
+    prediction_class = np.argmax(prediction_array, axis=-1)
+    #print("Predict array: {}, {}".format(prediction_array, prediction_array.shape))
+    print("Predicted class: {}, grountruth class: {}".format(prediction_class, test_labels))
+    
