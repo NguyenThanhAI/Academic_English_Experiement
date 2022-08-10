@@ -27,7 +27,7 @@ def get_args():
 
     parser.add_argument("--model_dir", type=str, default=".")
     parser.add_argument("--mode", type=str, choices=["train", "inference"])
-    parser.add_argument("--load", type=str2bool, default=False)
+    parser.add_argument("--load", type=str2bool, default=True)
 
     args = parser.parse_args()
 
@@ -35,8 +35,10 @@ def get_args():
 
 
 class ANN:
-    def __init__(self, layers_size):
+    def __init__(self, layers_size, model_dir: str=None, load: bool=False):
         self.layers_size = layers_size
+        self.model_dir = model_dir
+        self.load = load
         self.parameters = {}
         self.L = len(self.layers_size)
         self.n = 0
@@ -59,12 +61,17 @@ class ANN:
         return expZ / expZ.sum(axis=0, keepdims=True)
  
     def initialize_parameters(self):
-        np.random.seed(1)
+
+        if not self.load:
+            np.random.seed(1)
  
-        for l in range(1, len(self.layers_size)):
-            self.parameters["W_" + str(l)] = np.random.randn(self.layers_size[l - 1], self.layers_size[l]) / np.sqrt(
-                self.layers_size[l - 1])
-            self.parameters["b_" + str(l)] = np.zeros((self.layers_size[l], 1))
+            for l in range(1, len(self.layers_size)):
+                self.parameters["W_" + str(l)] = np.random.randn(self.layers_size[l - 1], self.layers_size[l]) / np.sqrt(
+                    self.layers_size[l - 1])
+                self.parameters["b_" + str(l)] = np.zeros((self.layers_size[l], 1))
+        
+        else:
+            self.load_model()
  
     def forward(self, X):
         store = {}
@@ -149,10 +156,10 @@ class ANN:
             if loop % 100 == 0:
                 
                 train_A, _ = self.forward(train_x)
-                train_cost = -np.mean(train_y * np.log(train_A.T + 1e-8))
+                train_cost = -np.mean(train_y * np.log(train_A.T + 1e-8) + (1 - train_y) * np.log(1 - train_A.T + 1e-8))
                 train_accuracy = self.evaluate(train_x, train_y)
                 val_A, _ = self.forward(val_x)
-                val_cost = -np.mean(val_y * np.log(val_A.T + 1e-8))
+                val_cost = -np.mean(val_y * np.log(val_A.T + 1e-8) + (1 - val_y) * np.log(1 - val_A.T + 1e-8))
                 val_accuracy = self.evaluate(val_x, val_y)
                 print("Step: {}, Train cost: {}, Train accuracy: {}, Val cost: {}, Val accuracy: {}".format(loop, train_cost, train_accuracy, val_cost, val_accuracy))
  
@@ -161,6 +168,8 @@ class ANN:
                 self.val_costs.append(val_cost)
                 self.train_accs.append(train_accuracy)
                 self.val_accs.append(val_accuracy)
+
+        self.save_model()
  
     def evaluate(self, X, Y):
         A, cache = self.forward(X)
@@ -172,9 +181,38 @@ class ANN:
     def predict(self, X):
         A, cache = self.forward(X)
         return A
+
+    def save_model(self):
+        save_dict = {}
+        save_dict["parameters"] = self.parameters
+        save_dict["layers_size"] = self.layers_size
+        save_dict["train_costs"] = self.train_costs
+        save_dict["val_costs"] = self.val_costs
+        save_dict["train_accs"] = self.train_accs
+        save_dict["val_accs"] = self.val_accs
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir, exist_ok=True)
+        with open(os.path.join(self.model_dir, "model.pkl"), "wb") as f:
+            pickle.dump(save_dict, f)
+            f.close()
+
+        print("Model saved")
+
+    def load_model(self):
+        if self.model_dir is None:
+            raise ValueError("Model dir must not be None")
+        with open(os.path.join(self.model_dir, "model.pkl"), "rb") as f:
+            save_dict = pickle.load(f)
+            self.parameters = save_dict["parameters"]
+            self.layers_size = save_dict["layers_size"]
+            self.L = len(self.layers_size) - 1
+            f.close()
+        
+        print("Model loaded")
+
  
     def plot_cost(self):
-        plt.figure()
+        #plt.figure()
         plt.subplots(2, 1, sharex=True)
         plt.subplot(2, 1, 1)
         plt.plot(np.arange(len(self.train_costs)), self.train_costs, label="train cost")
@@ -228,6 +266,9 @@ if __name__ == '__main__':
     #    train_y, test_y = labels[train_index], labels[test_index]
 
     args = get_args()
+    model_dir = args.model_dir
+    mode = args.mode
+    load = args.load
     learning_rate = 0.05
     batch_size = 256
     n_iterations = 10000
@@ -239,7 +280,7 @@ if __name__ == '__main__':
     #layers_dims = [32, 32, 32, 32, 2]
     layers_dims = [128, 128, 10]
  
-    ann = ANN(layers_dims)
+    ann = ANN(layers_dims, model_dir=model_dir, load=load)
     ann.fit(train_x, train_y, test_x, test_y, learning_rate=learning_rate, batch_size=batch_size, n_iterations=n_iterations)
     print("Train Accuracy:", ann.evaluate(train_x, train_y))
     print("Test Accuracy:", ann.evaluate(test_x, test_y))
